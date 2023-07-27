@@ -30,6 +30,26 @@ def merge_chunks_A_with_B(chunk_files_A, chunk_files_B, output_dir):
                     row_B = mapping_B.get(row_A[0], [None] * (len(header_B) - 1))  # get corresponding row from B using ID
                     writer.writerow(row_A + row_B)
 
+# CSV Bをすべてメモリに読み込むパターン（Polars使用
+
+import polars as pl
+from typing import List
+
+def merge_csv_chunks(file_paths_A: List[str], file_paths_B: List[str], chunk_size: int = 1000):
+    for i, file_path_A in enumerate(file_paths_A):
+        df_chunk_A = pl.read_csv(file_path_A)
+        df_chunk_B = pl.DataFrame()
+
+        # Concatenate all B chunks into a single DataFrame
+        for file_path_B in file_paths_B:
+            df_chunk_B = pl.concat([df_chunk_B, pl.read_csv(file_path_B)])
+        
+        # Merge chunks A and B based on ID column
+        merged_chunk = df_chunk_A.join(df_chunk_B, on="ID", how="left")
+
+        # Write the merged chunk to a new CSV file
+        merged_chunk.write_csv(f'merged_{i}.csv')
+
 
 # CSV Bをメモリに読み込まないパターン
 import csv
