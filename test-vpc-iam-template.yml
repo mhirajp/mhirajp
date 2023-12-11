@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: '2010-09-09'
+
+Resources:
+
+  FlowLogsRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      Path: '/'
+      RoleName: FlowLogsRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - 'vpc-flow-logs.amazonaws.com'
+            Action:
+              - 'sts:AssumeRole'
+      Policies:
+        - PolicyName: FlowLogPolicy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement: 
+              - Effect: Allow
+                Action: 
+                  - logs:CreateLogStream
+                  - logs:DescribeLogStreams
+                  - logs:CreateLogGroup
+                  - logs:PutLogEvents
+                Resource: "*"
+  InstanceRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      RoleName: InstanceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Path: '/'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore'
+
+  InstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: '/'
+      InstanceProfileName: InstanceRole
+      Roles:
+        - !Ref InstanceRole
+
+Outputs:
+  FlowLogsRoleArn:
+    Description: "The ARN of the IAM role created for VPC Flow Logs"
+    Value: !GetAtt FlowLogsRole.Arn
+    Export:
+      Name: test-vpc-iam-FlowLogsRoleArn
+  InstanceProfile:
+    Value: !Ref InstanceProfile
+    Export:
+      Name: test-vpc-iam-InstanceProfile
+

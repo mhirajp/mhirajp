@@ -1,0 +1,24 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template with VPC, Internet Gateway, Private Subnet, NAT Gateway, and EC2 instance
+
+Parameters:
+  AmiId:
+    Description: AMI ID for the EC2 instance
+    Type: String
+    Default: 'ami-098940df4d3292e9a'
+
+Resources:
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: m5.xlarge
+      ImageId: !Ref AmiId
+      IamInstanceProfile: !ImportValue test-vpc-iam-InstanceProfile
+      SubnetId: !ImportValue test-vpc-PrivateSubnet
+      SecurityGroupIds:
+        - !ImportValue test-vpc-MySecurityGroup
+      DisableApiTermination: true
+
+Outputs:
+  EC2InstanceId:
+    Value: !Ref MyEC2Instance
