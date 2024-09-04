@@ -1,0 +1,97 @@
+全体の流れ
+DynamoDBテーブルの作成:
+
+現在実行中のタスクを管理するためのDynamoDBテーブルを作成します。このテーブルには、タスクIDやステータス、開始時間などの情報を格納します。
+Step FunctionsからDynamoDBを参照:
+
+タスクを開始する前に、DynamoDBで現在の並列実行数を確認します。
+実行中のタスク数が8つ未満であれば、新しいタスクを開始します。
+8つ以上の場合は、タスクを待機させるか、別の処理を行います。
+タスクの完了後にDynamoDBを更新:
+
+タスクが完了したら、DynamoDBのエントリを削除またはステータスを更新し、並列実行数を減らします。
+手順の詳細
+1. DynamoDBテーブルの作成
+まず、以下のような構造を持つDynamoDBテーブルを作成します。
+
+Table Name: TaskExecutionTable
+Partition Key: TaskID (文字列)
+Attributes:
+TaskID: 各タスクのユニークID
+Status: タスクの状態（例: "Running", "Completed"）
+StartTime: タスクが開始された時間
+TaskType: タスクの種類（必要に応じて）
+2. Step FunctionsでDynamoDBを参照しながらタスクを管理
+Step Functionsの中でDynamoDBに対して、以下のような操作を行います。
+
+実行中のタスク数を確認:
+
+DynamoDBからStatusがRunningであるアイテムの数をカウントします。この操作はScanオペレーションで実行できます。
+例:
+
+json
+コードをコピーする
+{
+  "Type": "Task",
+  "Resource": "arn:aws:lambda:region:account-id:function:CheckRunningTasksFunction",
+  "ResultPath": "$.RunningTaskCount",
+  "Next": "タスク実行判定"
+}
+タスク実行判定:
+
+RunningTaskCountが8未満であれば、新しいタスクを実行し、DynamoDBに新しいエントリを作成します。8以上であれば待機または再試行します。
+例:
+
+json
+コードをコピーする
+{
+  "Type": "Choice",
+  "Choices": [
+    {
+      "Variable": "$.RunningTaskCount",
+      "NumericLessThan": 8,
+      "Next": "新タスク開始"
+    }
+  ],
+  "Default": "待機ステート"
+}
+新タスク開始:
+
+タスクを開始し、DynamoDBに新しいエントリを作成します。
+例:
+
+json
+コードをコピーする
+{
+  "Type": "Task",
+  "Resource": "arn:aws:lambda:region:account-id:function:StartNewTaskFunction",
+  "Next": "タスク完了待機"
+}
+タスク完了後の処理:
+
+タスクが完了したら、DynamoDBの該当エントリを削除するか、StatusをCompletedに更新します。
+例:
+
+json
+コードをコピーする
+{
+  "Type": "Task",
+  "Resource": "arn:aws:lambda:region:account-id:function:UpdateTaskStatusFunction",
+  "Next": "初期化ステート"
+}
+3. Lambda関数でDynamoDBの操作を実行
+DynamoDBの操作は、Step FunctionsのTaskステートを利用してLambda関数を呼び出すことで実現します。以下は、各Lambda関数の概要です。
+
+CheckRunningTasksFunction:
+
+DynamoDBのScanオペレーションを使用して、StatusがRunningであるエントリの数を返します。
+StartNewTaskFunction:
+
+新しいタスクを開始し、そのタスクの情報をDynamoDBに挿入します。
+UpdateTaskStatusFunction:
+
+タスクが完了した際に、DynamoDBのエントリを削除または更新します。
+実装の注意点
+エラーハンドリング: DynamoDBの操作が失敗した場合や、タスクの状態が不整合になる可能性を考慮し、適切なエラーハンドリングを行います。
+並列性の管理: DynamoDBの操作が正確に並列性を管理できるようにするため、コンディショナルチェックを利用することを検討してください。
+この構成により、常に8つのタスクが並列に実行され、タスク数が超えないように安全に制御できます。具体的なLambda関数の実装やDynamoDBのクエリの詳細についてのサポートが必要な場合、さらに詳細を提供できますのでお知らせください。
